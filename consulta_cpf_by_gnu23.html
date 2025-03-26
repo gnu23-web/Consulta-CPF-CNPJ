@@ -1,0 +1,355 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta CPF/CNPJ by GNU23</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white dark:bg-gray-900 min-h-screen transition-colors duration-300">
+    <div class="container mx-auto px-4 py-8 max-w-3xl">
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-white text-center mb-8">Consulta CPF/CNPJ BY GNU23</h1>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-center mb-4">
+                <div class="inline-flex rounded-md shadow-sm" role="group">
+                    <button type="button" id="cpf-tab" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-l-lg focus:outline-none">
+                        CPF
+                    </button>
+                    <button type="button" id="cnpj-tab" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 rounded-r-lg focus:outline-none">
+                        CNPJ
+                    </button>
+                </div>
+            </div>
+            
+            <form id="query-form" class="space-y-4">
+                <div class="relative">
+                    <input type="text" id="document-input" class="block w-full px-4 py-3 text-base text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Digite o CPF (apenas números)" maxlength="14">
+                    <div id="input-error" class="text-red-500 text-sm mt-1 hidden">Formato inválido</div>
+                </div>
+                
+                <button type="submit" id="submit-btn" class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                    Consultar
+                </button>
+            </form>
+        </div>
+        
+        <div id="loading" class="text-center p-4 hidden">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            <p class="mt-2 text-gray-700 dark:text-gray-300">Consultando dados...</p>
+        </div>
+        
+        <div id="result-container" class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hidden">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Resultado da Consulta</h2>
+            <div id="result-content" class="space-y-3">
+                <!-- Results will be displayed here -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Check for dark mode preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+        
+        // Constants and variables
+        const cpfTab = document.getElementById('cpf-tab');
+        const cnpjTab = document.getElementById('cnpj-tab');
+        const documentInput = document.getElementById('document-input');
+        const inputError = document.getElementById('input-error');
+        const queryForm = document.getElementById('query-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const loadingElement = document.getElementById('loading');
+        const resultContainer = document.getElementById('result-container');
+        const resultContent = document.getElementById('result-content');
+        
+        let currentDocType = 'cpf'; // Default to CPF
+        
+        // Tab switching logic
+        cpfTab.addEventListener('click', () => {
+            if (currentDocType !== 'cpf') {
+                cpfTab.classList.remove('bg-gray-100', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+                cpfTab.classList.add('bg-primary', 'text-white');
+                
+                cnpjTab.classList.remove('bg-primary', 'text-white');
+                cnpjTab.classList.add('bg-gray-100', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+                
+                currentDocType = 'cpf';
+                documentInput.placeholder = 'Digite o CPF (apenas números)';
+                documentInput.value = '';
+                documentInput.maxLength = 14;
+                hideResults();
+            }
+        });
+        
+        cnpjTab.addEventListener('click', () => {
+            if (currentDocType !== 'cnpj') {
+                cnpjTab.classList.remove('bg-gray-100', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+                cnpjTab.classList.add('bg-primary', 'text-white');
+                
+                cpfTab.classList.remove('bg-primary', 'text-white');
+                cpfTab.classList.add('bg-gray-100', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+                
+                currentDocType = 'cnpj';
+                documentInput.placeholder = 'Digite o CNPJ (apenas números)';
+                documentInput.value = '';
+                documentInput.maxLength = 18;
+                hideResults();
+            }
+        });
+        
+        // Input formatting
+        documentInput.addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            
+            if (currentDocType === 'cpf') {
+                // Format: 000.000.000-00
+                if (value.length > 9) {
+                    value = value.replace(/^(\d{3})(\d{3})(\d{3})(\d{1,2}).*/, '$1.$2.$3-$4');
+                } else if (value.length > 6) {
+                    value = value.replace(/^(\d{3})(\d{3})(\d{1,3}).*/, '$1.$2.$3');
+                } else if (value.length > 3) {
+                    value = value.replace(/^(\d{3})(\d{1,3}).*/, '$1.$2');
+                }
+            } else {
+                // Format: 00.000.000/0000-00
+                if (value.length > 12) {
+                    value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{1,2}).*/, '$1.$2.$3/$4-$5');
+                } else if (value.length > 8) {
+                    value = value.replace(/^(\d{2})(\d{3})(\d{3})(\d{1,4}).*/, '$1.$2.$3/$4');
+                } else if (value.length > 5) {
+                    value = value.replace(/^(\d{2})(\d{3})(\d{1,3}).*/, '$1.$2.$3');
+                } else if (value.length > 2) {
+                    value = value.replace(/^(\d{2})(\d{1,3}).*/, '$1.$2');
+                }
+            }
+            
+            e.target.value = value;
+        });
+        
+        // Form submission
+        queryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const value = documentInput.value.replace(/\D/g, '');
+            
+            // Validate input length
+            if ((currentDocType === 'cpf' && value.length !== 11) || 
+                (currentDocType === 'cnpj' && value.length !== 14)) {
+                inputError.textContent = `Formato de ${currentDocType.toUpperCase()} inválido`;
+                inputError.classList.remove('hidden');
+                return;
+            }
+            
+            // Hide any previous error
+            inputError.classList.add('hidden');
+            
+            // Show loading
+            loadingElement.classList.remove('hidden');
+            resultContainer.classList.add('hidden');
+            
+            // Simulate API call
+            setTimeout(() => {
+                performQuery(value);
+                loadingElement.classList.add('hidden');
+                resultContainer.classList.remove('hidden');
+            }, 1500);
+        });
+        
+        // Query simulation function
+        function performQuery(documentNumber) {
+            if (currentDocType === 'cpf') {
+                displayCPFResults(documentNumber);
+            } else {
+                displayCNPJResults(documentNumber);
+            }
+        }
+        
+        // Display CPF results
+        function displayCPFResults(cpf) {
+            // Generate mock data based on the CPF
+            const lastDigit = parseInt(cpf.charAt(10));
+            const status = lastDigit % 2 === 0 ? 'Regular' : 'Pendente de Regularização';
+            
+            let content = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">CPF</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${formatCPF(cpf)}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Nome</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomName()}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Data de Nascimento</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomDate()}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Situação Cadastral</p>
+                        <p class="font-medium ${status === 'Regular' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}">${status}</p>
+                    </div>
+                    <div class="space-y-2 md:col-span-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Endereço</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomAddress()}</p>
+                    </div>
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">* Esta é uma simulação. Em um ambiente real, estas informações seriam obtidas da Receita Federal.</p>
+                </div>
+            `;
+            
+            resultContent.innerHTML = content;
+        }
+        
+        // Display CNPJ results
+        function displayCNPJResults(cnpj) {
+            // Generate mock data based on the CNPJ
+            const lastDigit = parseInt(cnpj.charAt(13));
+            const status = lastDigit % 2 === 0 ? 'Ativa' : 'Suspensa';
+            
+            let content = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">CNPJ</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${formatCNPJ(cnpj)}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Razão Social</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomCompanyName()}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Nome Fantasia</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomTradeName()}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Data de Abertura</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomDate(true)}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Situação Cadastral</p>
+                        <p class="font-medium ${status === 'Ativa' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}">${status}</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Natureza Jurídica</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomLegalNature()}</p>
+                    </div>
+                    <div class="space-y-2 md:col-span-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Endereço</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomAddress(true)}</p>
+                    </div>
+                    <div class="space-y-2 md:col-span-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Atividade Principal</p>
+                        <p class="font-medium text-gray-900 dark:text-white">${generateRandomActivity()}</p>
+                    </div>
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">* Esta é uma simulação. Em um ambiente real, estas informações seriam obtidas da Receita Federal.</p>
+                </div>
+            `;
+            
+            resultContent.innerHTML = content;
+        }
+        
+        // Utility functions
+        function hideResults() {
+            resultContainer.classList.add('hidden');
+            inputError.classList.add('hidden');
+        }
+        
+        function formatCPF(cpf) {
+            return cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+        }
+        
+        function formatCNPJ(cnpj) {
+            return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+        }
+        
+        function generateRandomName() {
+            const firstNames = ['Ana', 'João', 'Maria', 'Pedro', 'Carla', 'Lucas', 'Julia', 'Rafael', 'Fernanda', 'Felipe'];
+            const lastNames = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Pereira', 'Costa', 'Ribeiro', 'Almeida', 'Carvalho', 'Ferreira'];
+            
+            return `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+        }
+        
+        function generateRandomCompanyName() {
+            const prefixes = ['Tech', 'Info', 'Brasil', 'Grupo', 'Indústria', 'Comércio', 'Serviços'];
+            const mains = ['Solutions', 'Systems', 'Informática', 'Tecnologia', 'Empreendimentos', 'Consultoria'];
+            const suffixes = ['Ltda', 'S.A.', 'Eireli', 'MEI'];
+            
+            return `${prefixes[Math.floor(Math.random() * prefixes.length)]} ${mains[Math.floor(Math.random() * mains.length)]} ${suffixes[Math.floor(Math.random() * suffixes.length)]}`;
+        }
+        
+        function generateRandomTradeName() {
+            const names = ['TechSol', 'InfoBrasil', 'DataSys', 'BrasilTI', 'SuperTech', 'MegaInfo', 'ProSolutions', 'FastSys'];
+            return names[Math.floor(Math.random() * names.length)];
+        }
+        
+        function generateRandomDate(isCompany = false) {
+            const year = isCompany ? 
+                Math.floor(Math.random() * 30) + 1990 : 
+                Math.floor(Math.random() * 50) + 1950;
+            const month = Math.floor(Math.random() * 12) + 1;
+            const day = Math.floor(Math.random() * 28) + 1;
+            
+            return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+        }
+        
+        function generateRandomAddress(isCompany = false) {
+            const streetTypes = ['Rua', 'Avenida', 'Alameda', 'Travessa'];
+            const streetNames = ['das Flores', 'dos Pinheiros', 'Brasil', 'São Paulo', 'Paulista', 'Santos Dumont', 'Juscelino Kubitschek'];
+            const districts = ['Centro', 'Jardim Paulista', 'Vila Mariana', 'Moema', 'Itaim Bibi', 'Pinheiros'];
+            const cities = ['São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba', 'Porto Alegre', 'Brasília'];
+            const states = ['SP', 'RJ', 'MG', 'PR', 'RS', 'DF'];
+            
+            const number = Math.floor(Math.random() * 2000) + 1;
+            
+            return `${streetTypes[Math.floor(Math.random() * streetTypes.length)]} ${streetNames[Math.floor(Math.random() * streetNames.length)]}, ${number} - ${districts[Math.floor(Math.random() * districts.length)]}, ${cities[Math.floor(Math.random() * cities.length)]} - ${states[Math.floor(Math.random() * states.length)]}`;
+        }
+        
+        function generateRandomLegalNature() {
+            const types = [
+                '206-2 - Sociedade Empresária Limitada',
+                '213-5 - Empresário Individual',
+                '230-5 - Empresa Individual de Responsabilidade Limitada',
+                '204-6 - Sociedade Anônima Aberta',
+                '205-4 - Sociedade Anônima Fechada'
+            ];
+            
+            return types[Math.floor(Math.random() * types.length)];
+        }
+        
+        function generateRandomActivity() {
+            const activities = [
+                '62.01-5-01 - Desenvolvimento de programas de computador sob encomenda',
+                '62.02-3-00 - Desenvolvimento e licenciamento de programas de computador customizáveis',
+                '62.03-1-00 - Desenvolvimento e licenciamento de programas de computador não-customizáveis',
+                '47.51-2-01 - Comércio varejista especializado de equipamentos e suprimentos de informática',
+                '82.11-3-00 - Serviços combinados de escritório e apoio administrativo'
+            ];
+            
+            return activities[Math.floor(Math.random() * activities.length)];
+        }
+    </script>
+
+
+</body></html>
